@@ -1,6 +1,7 @@
 package lap
 
 import (
+	"fmt"
 	"reflect"
 	"unsafe"
 )
@@ -88,6 +89,22 @@ func (v *DenseV) SubVec(a, b Vector) {
 	}
 }
 
+// CopyVec makes a copy of elements of a into the receiver and returns the amount
+// of elements copied. If the receiver has not been initialized then a vector is allocated.
+func (v *DenseV) CopyVec(a Vector) int {
+	n := a.Len()
+	if len(v.data) == 0 {
+		*v = NewDenseVector(n, nil)
+	}
+	if n != v.Len() {
+		panic(ErrDim)
+	}
+	for i := 0; i < n; i++ {
+		v.SetVec(i, a.AtVec(i))
+	}
+	return n
+}
+
 // MulVec computes A * b. The result is stored into the receiver.
 // MulVec panics if the number of columns in A does not equal the number of
 // rows in b or if the number of columns in b does not equal 1.
@@ -144,12 +161,20 @@ func aliasedData(a, b Matrix) bool {
 func dataHeader(m Matrix) reflect.SliceHeader {
 	var backingData []float64
 	switch D := m.(type) {
+	case *DenseM:
+		backingData = D.data
 	case DenseM:
 		backingData = D.data
 	case DenseV:
 		backingData = D.data
+	case subMat:
+		return dataHeader(D.m)
+	case subVec:
+		return dataHeader(D.m)
+	case Transpose:
+		return dataHeader(D.m)
 	default:
-		panic("unknown Matrix type. Can't determine backing data")
+		panic("unknown Matrix type. Can't determine backing data" + fmt.Sprintf("%T", D))
 	}
 	return *(*reflect.SliceHeader)(unsafe.Pointer(&backingData))
 }

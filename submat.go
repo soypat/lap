@@ -8,14 +8,34 @@ type subMat struct {
 	m          Matrix
 }
 
-func (bm subMat) At(i, j int) float64 { return bm.m.At(bm.ridx[i], bm.cidx[j]) }
-func (bm subMat) Dims() (int, int)    { return len(bm.ridx), len(bm.cidx) }
+func (bm subMat) At(i, j int) float64 {
+	lr := len(bm.ridx)
+	lc := len(bm.cidx)
+	if lr != 0 {
+		i = bm.ridx[i]
+	}
+	if lc != 0 {
+		j = bm.cidx[j]
+	}
+	return bm.m.At(i, j)
+}
+
+func (bm subMat) Dims() (int, int) {
+	r, c := bm.m.Dims()
+	lr := len(bm.ridx)
+	lc := len(bm.cidx)
+	if lr != 0 {
+		r = lr
+	}
+	if lc != 0 {
+		c = lc
+	}
+	return r, c
+}
 
 // Slice slices a matrix given row and column indices.
+// an empty slice means the entire dimension is taken.
 func Slice(m Matrix, rowIx, colIx []int) Matrix {
-	if len(rowIx) == 0 || len(colIx) == 0 {
-		panic("cannot have zero dimension SubIdx")
-	}
 	r, c := m.Dims()
 	for _, ir := range rowIx {
 		if ir >= r {

@@ -30,7 +30,7 @@ func TestSwapRows_Copy(t *testing.T) {
 		3, 4, 5,
 	})
 	var B DenseM
-	B.CopyFrom(A)
+	B.Copy(A)
 	B.SwapRows(0, 1)
 	for i := 0; i < 3; i++ {
 		at := B.At(0, i)
@@ -73,7 +73,7 @@ func TestMatCopy(t *testing.T) {
 	// an implementation.  _shrug_
 	A := NewDenseMatrix(4, 4, nil)
 	var B DenseM
-	B.CopyFrom(A)
+	B.Copy(A)
 	dataptrA := (*reflect.SliceHeader)(unsafe.Pointer(&A.data)).Data
 	dataptrB := (*reflect.SliceHeader)(unsafe.Pointer(&B.data)).Data
 	if dataptrA == dataptrB {
@@ -89,7 +89,7 @@ func TestMatCopyTo(t *testing.T) {
 		13, 14, 15, 16})
 
 	B := NewDenseMatrix(4, 4, nil)
-	B.CopyFrom(A)
+	B.Copy(A)
 	m, n := A.Dims()
 	for i := 0; i < m; i++ {
 		for j := 0; j < n; j++ {
@@ -102,7 +102,31 @@ func TestMatCopyTo(t *testing.T) {
 	}
 }
 
-func TestMatL2Norm(t *testing.T) {
+func TestDenseSlice(t *testing.T) {
+	var d DenseM
+	d.Copy(magic3)
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			for k := i + 1; k <= 3; k++ {
+				for l := j + 1; l <= 3; l++ {
+					sli := d.Slice(i, k, j, l)
+					r, c := sli.Dims()
+					for ii := 0; ii < r; ii++ {
+						for jj := 0; jj < c; jj++ {
+							expect := d.At(i+ii, j+jj)
+							got := sli.At(ii, jj)
+							if expect != got {
+								t.Error("got not expect", got, expect)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestNorm(t *testing.T) {
 	data := []float64{
 		1, 2, 3,
 		4, 5, 6}
@@ -112,7 +136,7 @@ func TestMatL2Norm(t *testing.T) {
 		expectation += v * v
 	}
 	expectation = math.Sqrt(expectation)
-	norm := A.Norm(2)
+	norm := Norm(A, 2)
 	if !almostEqual(expectation, norm, almostEps) {
 		t.Errorf("expected %f, got %f", expectation, norm)
 	}

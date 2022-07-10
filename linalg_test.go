@@ -22,12 +22,6 @@ func TestAliasedData(t *testing.T) {
 	}
 }
 
-func TestJacobiSVD(t *testing.T) {
-	var m DenseM
-	m.CopyFrom(magic3)
-	// U, S, p := JacobiSVD(m)
-}
-
 func TestArgmax(t *testing.T) {
 	mat := magic3
 	i, j := Argmax(mat)

@@ -2,7 +2,7 @@ package lap
 
 import (
 	"errors"
-	"math"
+	"fmt"
 )
 
 var (
@@ -20,8 +20,9 @@ type Matrix interface {
 
 // DenseM represents a row major storage matrix.
 type DenseM struct {
-	data []float64
-	r, c int
+	data   []float64
+	stride int
+	r, c   int
 }
 
 // Dims returns the dimensions of the matrix.
@@ -34,7 +35,7 @@ func (d DenseM) At(i, j int) float64 {
 	} else if j < 0 || j >= d.c {
 		panic(ErrColAccess)
 	}
-	return d.data[i*d.c+j]
+	return d.data[i*d.stride+j]
 }
 
 // Set sets d's element at ith row, jth column to v.
@@ -44,13 +45,13 @@ func (d *DenseM) Set(i, j int, v float64) {
 	} else if j < 0 || j >= d.c {
 		panic(ErrColAccess)
 	}
-	d.data[i*d.c+j] = v
+	d.data[i*d.stride+j] = v
 }
 
-// CopyFrom produces a copy of A with no overlapping memory.
+// Copy produces a copy of A with no overlapping memory.
 // If the receiver is not initialized then the backing array is allocated
 // automatically.
-func (d *DenseM) CopyFrom(A Matrix) {
+func (d *DenseM) Copy(A Matrix) {
 	r, c := A.Dims()
 	if d.data == nil {
 		*d = NewDenseMatrix(r, c, nil)
@@ -60,7 +61,7 @@ func (d *DenseM) CopyFrom(A Matrix) {
 	}
 	for i := 0; i < d.r; i++ {
 		for j := 0; j < d.c; j++ {
-			d.data[i*d.c+j] = A.At(i, j)
+			d.data[i*d.stride+j] = A.At(i, j)
 		}
 	}
 }
@@ -75,9 +76,10 @@ func NewDenseMatrix(r, c int, data []float64) (d DenseM) {
 		data = make([]float64, r*c)
 	}
 	return DenseM{
-		data: data,
-		r:    r,
-		c:    c,
+		data:   data,
+		r:      r,
+		c:      c,
+		stride: c,
 	}
 }
 
@@ -102,23 +104,25 @@ func Eye(n int) Matrix {
 	return eye(n)
 }
 
-// Norm calculates the norm of the matrix. Only Frobenius is implemented.
-//  1 - The maximum absolute column sum
-//  2 - The Frobenius norm, the square root of the sum of the squares of the elements
-//  Inf - The maximum absolute row sum
-// This implements gonum's Normer interface.
-func (d DenseM) Norm(norm float64) float64 {
-	if norm != 2 {
-		panic("not implemented")
+// Slice returns a new Matrix that shares backing data with the receiver.
+// The returned matrix starts at {i,j} of the receiver and extends k-i rows
+// and l-j columns. The final row in the resulting matrix is k-1 and the
+// final column is l-1.
+// Slice panics with ErrIndexOutOfRange if the slice is outside the capacity
+// of the receiver.
+func (d DenseM) Slice(i, k, j, l int) DenseM {
+	mr, mc := d.Dims()
+	if k <= i || l <= j {
+		// Common error or group with below?
+		panic(ErrDim)
 	}
-	var out float64
-	for i := 0; i < d.r; i++ {
-		for j := 0; j < d.c; j++ {
-			g := d.At(i, j)
-			out += g * g
-		}
+	if i < 0 || mr <= i || j < 0 || mc <= j || mr < k || mc < l {
+		panic(ErrDim)
 	}
-	return math.Sqrt(out)
+	d.data = d.data[i*d.stride+j : (k-1)*d.stride+l]
+	d.r = k - i
+	d.c = l - j
+	return d
 }
 
 type Transpose struct {
@@ -144,85 +148,6 @@ func T(A Matrix) Matrix {
 	return Transpose{m: A}
 }
 
-// MatInvertSquare inverts square matrix A of dimension nxn, storing the result in out.
-// scratch must be n x 2n or nil in which case the slice is allocated temporarily.
-//
-// Gauss-Jordan elimination is used to perform the inversion, A must be non-singular.
-func (out *DenseM) invertSquare(A Matrix, scratchSlice []float64) error {
-	n, c := A.Dims()
-	if n != c {
-		return ErrDim
-	}
-	n2 := 2 * n
-	if out.data == nil {
-		*out = NewDenseMatrix(n, n, nil)
-	}
-	var scratchZeroed bool
-	if scratchSlice == nil {
-		scratchZeroed = true
-		scratchSlice = make([]float64, n*n2)
-	} else if len(scratchSlice) < n*n2 {
-		return ErrDim
-	}
-	scratch := NewDenseMatrix(n, n2, scratchSlice)
-
-	// make scratch into the augmenting identity matrix
-	for i := 0; i < n; i++ {
-		ridx := i * scratch.c
-		for j := 0; j < n2; j++ {
-			if j < n {
-				scratch.data[ridx+j] = A.At(i, j)
-			}
-			if j == i+n {
-				scratch.data[ridx+j] = 1
-			} else if !scratchZeroed {
-				// would not need this if we alloced (guaranteed zero)
-				// but to be safe, zero here
-				scratch.data[ridx+j] = 0
-			}
-		}
-	}
-	// exchange rows of the matrix, bottom-up
-	for i := n - 1; i > 0; i-- {
-		if scratch.At(i-1, 0) < scratch.At(i, 0) {
-			scratch.SwapRows(i, i-1)
-		}
-	}
-
-	// replace each row by sum of itself and a constant times another row
-	for i := 0; i < n; i++ {
-		// ic := i * scratch.c
-		for j := 0; j < n; j++ {
-			if i != j {
-				tmp := scratch.At(j, i) / scratch.At(i, i)
-				for k := 0; k < n2; k++ {
-					result := scratch.At(j, k) - scratch.At(i, k)*tmp
-					scratch.Set(j, k, result)
-				}
-			}
-		}
-	}
-	const eps = 1e-16
-	// mul each row by a nonzero integer and divide each row by the diagonal
-	for i := 0; i < n; i++ {
-		tmp := scratch.At(i, i)
-		if math.Abs(tmp) < eps {
-			return ErrSingular
-		}
-		for j := 0; j < n2; j++ {
-			scratch.Set(i, j, scratch.At(i, j)/tmp)
-		}
-	}
-
-	// scratch now contains the inverse of input in its lefthand half
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			out.Set(i, j, scratch.At(i, j))
-		}
-	}
-	return nil
-}
-
 // MatMul computes the matrix-matrix product C = AB for (nxm) matrix A and (mxp)
 // matrix B, storing the result in (nxp) matrix C.
 func (C *DenseM) Mul(A, B Matrix) {
@@ -239,7 +164,7 @@ func (C *DenseM) Mul(A, B Matrix) {
 		panic(ErrAliasedData)
 	}
 	for i := 0; i < n; i++ {
-		ridx := i * nC
+		ridx := i * C.stride
 		for j := 0; j < p; j++ {
 			tmp := 0.0
 			for k := 0; k < m; k++ {
@@ -259,7 +184,7 @@ func (C DenseM) Add(A, B Matrix) {
 		panic(ErrDim)
 	}
 	for i := 0; i < r; i++ {
-		ridx := i * C.c
+		ridx := i * C.stride
 		for j := 0; j < c; j++ {
 			C.data[ridx+j] = A.At(i, j) + B.At(i, j)
 		}
@@ -275,7 +200,7 @@ func (C DenseM) Sub(A, B Matrix) {
 		panic(ErrDim)
 	}
 	for i := 0; i < r; i++ {
-		ridx := i * C.c
+		ridx := i * C.stride
 		for j := 0; j < c; j++ {
 			C.data[ridx+j] = A.At(i, j) - B.At(i, j)
 		}
@@ -285,31 +210,78 @@ func (C DenseM) Sub(A, B Matrix) {
 // SwapRows swaps rows i and j of A in-place.
 func (A DenseM) SwapRows(i, j int) {
 	for k := 0; k < A.c; k++ {
-		A.data[i*A.c+k], A.data[j*A.c+k] = A.data[j*A.c+k], A.data[i*A.c+k]
+		A.data[i*A.stride+k], A.data[j*A.stride+k] = A.data[j*A.stride+k], A.data[i*A.stride+k]
 	}
 }
 
 func (A DenseM) SwapCols(i, j int) {
 	for k := 0; k < A.r; k++ {
-		A.data[k*A.c+i], A.data[k*A.c+j] = A.data[k*A.c+j], A.data[k*A.c+i]
+		A.data[k*A.stride+i], A.data[k*A.stride+j] = A.data[k*A.stride+j], A.data[k*A.stride+i]
 	}
 }
 
-func (A DenseM) RowView(i int) Vector {
+func (A DenseM) RowView(i int) DenseV {
 	if i >= A.r || i < 0 {
 		panic(ErrRowAccess)
 	}
 	return DenseV{
-		data: A.data[i*A.c : (i+1)*A.c],
+		data: A.data[i*A.stride : (i+1)*A.stride],
 	}
 }
 
-func (A DenseM) ColView(j int) Vector {
+func (A DenseM) ColView(j int) DenseV {
 	if j >= A.c || j < 0 {
 		panic(ErrColAccess)
 	}
 	return DenseV{
 		data:        A.data[j:],
-		incMinusOne: A.c - 1,
+		incMinusOne: A.stride - 1,
 	}
+}
+
+// CopyBlocks copies mrows rows and mcols columns of matrices
+// passed in src.
+func (dst *DenseM) CopyBlocks(mrows, mcols int, src []Matrix) error {
+	if len(src) != mrows*mcols {
+		return ErrDim
+	}
+	var tr, tc int
+	for i := 0; i < mrows; i++ {
+		r, _ := src[i*mcols].Dims()
+		tr += r
+	}
+	for j := 0; j < mcols; j++ {
+		_, c := src[j].Dims()
+		tc += c
+	}
+	if dst.data == nil {
+		*dst = NewDenseMatrix(tr, tc, nil)
+	}
+	r, c := dst.Dims()
+	if r != tr || c != tc {
+		return ErrDim
+	}
+
+	var br int
+	for i := 0; i < mrows; i++ {
+		var bc int
+		h, _ := src[i*mcols].Dims()
+		for j := 0; j < mcols; j++ {
+			r, c := src[i*mcols+j].Dims()
+			if r != h {
+				return fmt.Errorf("matrix at %d,%d is wrong height: %d != %d:  %w", i, j, r, h, ErrDim)
+			}
+			if i != 0 {
+				_, w := src[j].Dims()
+				if c != w {
+					return fmt.Errorf("matrix at %d,%d is wrong width: %d != %d:  %w", i, j, c, w, ErrDim)
+				}
+			}
+			sli := dst.Slice(br, br+r, bc, bc+c)
+			sli.Copy(src[i*mcols+j])
+			bc += c
+		}
+		br += h
+	}
+	return nil
 }
