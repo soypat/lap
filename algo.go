@@ -45,7 +45,6 @@ func JacobiSVD(A DenseM) (sigma DenseV) {
 					Aux.Mul(Slice(A, nil, []int{p, q}), G)
 					colp.CopyVec(Aux.ColView(0))
 					colq.CopyVec(Aux.ColView(1))
-					_ = colq
 				}
 			}
 		}
