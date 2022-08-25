@@ -57,6 +57,9 @@ func (s Sparse) At(i, j int) float64 {
 	} else if j >= s.c {
 		panic(ErrColAccess)
 	}
+	if s.m == nil {
+		return 0
+	}
 	return s.m[[2]int{i, j}]
 }
 
