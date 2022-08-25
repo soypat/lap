@@ -98,8 +98,6 @@ func (s Sparse) Resize(r, c int) {
 	if s.m == nil {
 		s.m = make(map[[2]int]float64)
 	}
-	s.r = r
-	s.c = c
 	if r < s.r || c < s.c {
 		for k := range s.m {
 			if k[0] >= r || k[1] >= c {
@@ -107,6 +105,8 @@ func (s Sparse) Resize(r, c int) {
 			}
 		}
 	}
+	s.r = r
+	s.c = c
 }
 
 // Accumulate adds indexed data to s.
