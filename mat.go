@@ -214,9 +214,12 @@ func (C *DenseM) Sub(A, B Matrix) {
 }
 
 // Scale multiplies the elements of A by f, placing the result in the receiver.
-func (C DenseM) Scale(f float64, A Matrix) {
-	r, c := C.Dims()
+func (C *DenseM) Scale(f float64, A Matrix) {
 	rA, cA := A.Dims()
+	if C.data == nil {
+		*C = NewDenseMatrix(rA, cA, nil)
+	}
+	r, c := C.Dims()
 	if rA != r || cA != c {
 		panic(ErrDim)
 	}

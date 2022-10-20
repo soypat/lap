@@ -7,13 +7,13 @@ import (
 	"github.com/soypat/lap"
 )
 
-func ExampleDenseV_neuralNetwork() {
+func ExampleDenseM_neuralNetwork() {
 	// Inspired directly by Santiago's tweet
 	// https://gist.github.com/svpino/e54ff030c424cefaffeec1bd690042cc  https://twitter.com/svpino/status/1582703127651721217?t=g3aXpwKbqCBIW9AJYzgKgA&s=08
 	const (
 		learningRate = 0.1
-		inputSize    = 4
-		hiddenSize   = 2
+		casesSize    = 4
+		inputSize    = 2
 		outputSize   = 1
 		epochs       = 10000
 	)
@@ -32,34 +32,49 @@ func ExampleDenseV_neuralNetwork() {
 	}
 
 	// weights that connect the input with layer1
-	W1 := randomMatrix(hiddenSize, inputSize)
+	W1 := randomMatrix(inputSize, casesSize)
 	// weights that connect layer1 with output.
-	W2 := randomMatrix(inputSize, outputSize)
-	// Inputs are X and y.
-	X := lap.NewDenseMatrix(inputSize, hiddenSize, []float64{
+	W2 := randomMatrix(casesSize, outputSize)
+	// cases represents all possible inputs.
+	// Each row is a input to the neural network.
+	cases := lap.NewDenseMatrix(casesSize, inputSize, []float64{
 		0, 0,
 		0, 1,
 		1, 0,
 		1, 1,
 	})
-	y := lap.NewDenseVector(inputSize, []float64{0, 1, 1, 1})
+	ORresult := lap.NewDenseVector(casesSize, []float64{0, 1, 1, 1})
 
-	var layer1, output, aux, aux2, nnerror, delta2 lap.DenseM
+	var layer1, output, aux1, aux2, aux3, aux4, aux5, nnerror, delta1, delta2 lap.DenseM
 	for epoch := 0; epoch < epochs; epoch++ {
-		layer1.Mul(X, W1)
+		// Example under construction.
+		layer1.Mul(cases, W1)
 		applySigmoid(layer1)
 		output.Mul(layer1, W2)
 		applySigmoid(output)
-		nnerror.Sub(y, output)
+		nnerror.Sub(ORresult, output)
 
-		aux.Copy(output)
-		aux.DoSet(func(_, _ int, v float64) float64 { return 1 - v })
-		// delta2.Mul(output, aux)
-		// aux2.Mul(nnerror, delta2)
-		// Example under construction.
+		aux1.Copy(output)
+		aux1.DoSet(func(_, _ int, v float64) float64 { return 1 - v })
+		d2 := lap.Dot(output.ColView(0), aux1.ColView(0))
+		delta2.Scale(2*d2, nnerror)
+
+		aux2.Copy(layer1)
+		aux2.DoSet(func(i, j int, v float64) float64 { return 1 - v })
+		aux3.Mul(layer1, aux2)
+		aux4.Mul(delta2, lap.T(W2))
+		delta1.Mul(aux4, aux3)
+		// Prepare modifying neural network nodes.
+		aux1.Mul(lap.T(layer1), delta2)
+		aux1.Scale(learningRate, aux1)
+		W2.Add(W2, aux1)
+
+		aux5.Mul(lap.T(cases), delta1)
+		aux5.Scale(learningRate, aux5)
+		W1.Add(W1, aux5)
 	}
-	_, _ = aux2, delta2
 	// fmt.Println(output)
+	// Should yield
+	//{[0 1 1 1] 1 4 1}
 	//Output:
-
 }
