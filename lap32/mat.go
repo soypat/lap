@@ -1,4 +1,4 @@
-package lap
+package lap32
 
 import (
 	"errors"
@@ -14,13 +14,13 @@ var (
 )
 
 type Matrix interface {
-	At(i, j int) float64
+	At(i, j int) float32
 	Dims() (r, c int)
 }
 
 // DenseM represents a row major storage matrix.
 type DenseM struct {
-	data   []float64
+	data   []float32
 	stride int
 	r, c   int
 }
@@ -29,7 +29,7 @@ type DenseM struct {
 func (d DenseM) Dims() (int, int) { return d.r, d.c }
 
 // At returns d's element at ith row, jth column.
-func (d DenseM) At(i, j int) float64 {
+func (d DenseM) At(i, j int) float32 {
 	if i < 0 || i >= d.r {
 		panic(ErrRowAccess)
 	} else if j < 0 || j >= d.c {
@@ -39,7 +39,7 @@ func (d DenseM) At(i, j int) float64 {
 }
 
 // Set sets d's element at ith row, jth column to v.
-func (d *DenseM) Set(i, j int, v float64) {
+func (d *DenseM) Set(i, j int, v float32) {
 	if i < 0 || i >= d.r {
 		panic(ErrRowAccess)
 	} else if j < 0 || j >= d.c {
@@ -71,9 +71,9 @@ func (d *DenseM) Copy(A Matrix) {
 // of the output from being scattered in memory.
 //
 // data may be nil, in which case an array of zeros is returned
-func NewDenseMatrix(r, c int, data []float64) (d DenseM) {
+func NewDenseMatrix(r, c int, data []float32) (d DenseM) {
 	if data == nil {
-		data = make([]float64, r*c)
+		data = make([]float32, r*c)
 	}
 	return DenseM{
 		data:   data,
@@ -86,7 +86,7 @@ func NewDenseMatrix(r, c int, data []float64) (d DenseM) {
 type eye int
 
 func (e eye) Dims() (int, int) { return int(e), int(e) }
-func (e eye) At(i, j int) float64 {
+func (e eye) At(i, j int) float32 {
 	if i < 0 || i > int(e) {
 		panic(ErrRowAccess)
 	}
@@ -129,7 +129,7 @@ type Transpose struct {
 	m Matrix
 }
 
-func (t Transpose) At(i, j int) float64 {
+func (t Transpose) At(i, j int) float32 {
 	return t.m.At(j, i)
 }
 
@@ -166,7 +166,7 @@ func (C *DenseM) Mul(A, B Matrix) {
 	for i := 0; i < n; i++ {
 		ridx := i * C.stride
 		for j := 0; j < p; j++ {
-			tmp := 0.0
+			var tmp float32
 			for k := 0; k < m; k++ {
 				tmp += A.At(i, k) * B.At(k, j)
 			}
@@ -214,7 +214,7 @@ func (C *DenseM) Sub(A, B Matrix) {
 }
 
 // Scale multiplies the elements of A by f, placing the result in the receiver.
-func (C *DenseM) Scale(f float64, A Matrix) {
+func (C *DenseM) Scale(f float32, A Matrix) {
 	rA, cA := A.Dims()
 	if C.data == nil {
 		*C = NewDenseMatrix(rA, cA, nil)
@@ -315,7 +315,7 @@ func (dst *DenseM) CopyBlocks(mrows, mcols int, src []Matrix) error {
 
 // DoSet iterates over all matrix elements calling fn on them and setting
 // the value at i,j to the result of fn.
-func (A DenseM) DoSet(fn func(i, j int, v float64) float64) {
+func (A DenseM) DoSet(fn func(i, j int, v float32) float32) {
 	for i := 0; i < A.r; i++ {
 		offset := i * A.stride
 		for j := 0; j < A.c; j++ {

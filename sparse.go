@@ -97,7 +97,7 @@ func NewSparse(r, c int) Sparse {
 
 // Resize gives sparse matrix a new size and discards old data out of bounds
 // (right and lower matrix).
-func (s Sparse) Resize(r, c int) {
+func (s *Sparse) Resize(r, c int) {
 	if s.m == nil {
 		s.m = make(map[[2]int]float64)
 	}
@@ -161,6 +161,6 @@ func (s Sparse) DoNonZero(fn func(i, j int, v float64)) {
 func (s Sparse) CountNonZero() int { return len(s.m) }
 
 // Zero sets all matrix values to zero.
-func (s Sparse) Zero() {
+func (s *Sparse) Zero() {
 	s.m = nil
 }

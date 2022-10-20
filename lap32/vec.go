@@ -1,4 +1,4 @@
-package lap
+package lap32
 
 import (
 	"fmt"
@@ -8,20 +8,20 @@ import (
 
 type Vector interface {
 	Matrix
-	AtVec(i int) float64
+	AtVec(i int) float32
 	Len() int
 }
 
 type DenseV struct {
-	data        []float64
+	data        []float32
 	incMinusOne int
 }
 
 // NewDenseVector returns a vector of length n with data. If data is nil it is
 // automatically allocated.
-func NewDenseVector(n int, data []float64) DenseV {
+func NewDenseVector(n int, data []float32) DenseV {
 	if data == nil {
-		data = make([]float64, n)
+		data = make([]float32, n)
 	}
 	if len(data) != n {
 		panic(ErrDim)
@@ -32,7 +32,7 @@ func NewDenseVector(n int, data []float64) DenseV {
 }
 
 func (v DenseV) Dims() (int, int) { return v.Len(), 1 }
-func (v DenseV) At(i, j int) float64 {
+func (v DenseV) At(i, j int) float32 {
 	if j != 0 {
 		panic(ErrColAccess)
 	}
@@ -52,14 +52,14 @@ func (v DenseV) Len() int {
 	return l
 }
 
-func (v DenseV) AtVec(i int) float64 {
+func (v DenseV) AtVec(i int) float32 {
 	if v.incMinusOne != 0 {
 		return v.data[i*(v.incMinusOne+1)]
 	}
 	return v.data[i]
 }
 
-func (v *DenseV) SetVec(i int, f float64) {
+func (v *DenseV) SetVec(i int, f float32) {
 	if v.incMinusOne != 0 {
 		v.data[i*(v.incMinusOne+1)] = f
 	} else {
@@ -129,7 +129,7 @@ func (v *DenseV) MulVec(A Matrix, b Vector) {
 		panic(ErrDim)
 	}
 	for i := 0; i < m; i++ {
-		tmp := 0.0
+		var tmp float32
 		for j := 0; j < n; j++ {
 			tmp += A.At(i, j) * b.AtVec(j)
 		}
@@ -156,7 +156,7 @@ func (v *DenseV) MulElemVec(a, b Vector) {
 
 // DoSet iterates over all vector elements calling fn on them and setting
 // the value at i to the result of fn.
-func (A DenseV) DoSetVec(fn func(i int, v float64) float64) {
+func (A DenseV) DoSetVec(fn func(i int, v float32) float32) {
 	// TODO(soypat): This could be optimized for direct access.
 	n := A.Len()
 	for i := 0; i < n; i++ {
@@ -175,7 +175,7 @@ func aliasedData(a, b Matrix) bool {
 }
 
 func dataHeader(m Matrix) reflect.SliceHeader {
-	var backingData []float64
+	var backingData []float32
 	switch D := m.(type) {
 	case *DenseM:
 		backingData = D.data

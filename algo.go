@@ -66,8 +66,10 @@ func JacobiSVD(A DenseM) (sigma DenseV) {
 }
 
 // The Jacobi rotation is a plane unitary similarity transformation:
-//  [ c  s ]T [ alpha  beta ]  [ c  s ]  =  [ l1  0 ]
-//  [-s  c ]  [ beta  gamma ]  [-s  c ]  =  [ 0  l2 ]
+//
+//	[ c  s ]T [ alpha  beta ]  [ c  s ]  =  [ l1  0 ]
+//	[-s  c ]  [ beta  gamma ]  [-s  c ]  =  [ 0  l2 ]
+//
 // where G = [c, s; -s, c]
 func (G *DenseM) jacobi(alpha, beta, gamma float64) (t float64) {
 	if r, c := G.Dims(); r != 2 && c != 2 {
@@ -117,7 +119,7 @@ func (out *DenseM) invertSquare(A Matrix, scratchSlice []float64) error {
 
 	// make scratch into the augmenting identity matrix
 	for i := 0; i < n; i++ {
-		ridx := i * scratch.c
+		ridx := i * scratch.stride
 		for j := 0; j < n2; j++ {
 			if j < n {
 				scratch.data[ridx+j] = A.At(i, j)
