@@ -176,10 +176,13 @@ func (C *DenseM) Mul(A, B Matrix) {
 }
 
 // Sub stores the elementwise addition A+B in C.
-func (C DenseM) Add(A, B Matrix) {
-	r, c := C.Dims()
+func (C *DenseM) Add(A, B Matrix) {
 	rA, cA := A.Dims()
 	rB, cB := B.Dims()
+	if C.data == nil {
+		*C = NewDenseMatrix(rA, cA, nil)
+	}
+	r, c := C.Dims()
 	if rA != r || rB != r || cA != c || cB != c {
 		panic(ErrDim)
 	}
@@ -192,10 +195,13 @@ func (C DenseM) Add(A, B Matrix) {
 }
 
 // Sub stores the elementwise difference A-B in C.
-func (C DenseM) Sub(A, B Matrix) {
-	r, c := C.Dims()
+func (C *DenseM) Sub(A, B Matrix) {
 	rA, cA := A.Dims()
 	rB, cB := B.Dims()
+	if C.data == nil {
+		*C = NewDenseMatrix(rA, cA, nil)
+	}
+	r, c := C.Dims()
 	if rA != r || rB != r || cA != c || cB != c {
 		panic(ErrDim)
 	}
@@ -207,16 +213,34 @@ func (C DenseM) Sub(A, B Matrix) {
 	}
 }
 
+// Scale multiplies the elements of A by f, placing the result in the receiver.
+func (C DenseM) Scale(f float64, A Matrix) {
+	r, c := C.Dims()
+	rA, cA := A.Dims()
+	if rA != r || cA != c {
+		panic(ErrDim)
+	}
+	for i := 0; i < r; i++ {
+		ridx := i * C.stride
+		for j := 0; j < c; j++ {
+			C.data[ridx+j] = f * A.At(i, j)
+		}
+	}
+}
+
 // SwapRows swaps rows i and j of A in-place.
 func (A DenseM) SwapRows(i, j int) {
+	iidx := i * A.stride
+	jidx := j * A.stride
 	for k := 0; k < A.c; k++ {
-		A.data[i*A.stride+k], A.data[j*A.stride+k] = A.data[j*A.stride+k], A.data[i*A.stride+k]
+		A.data[iidx+k], A.data[jidx+k] = A.data[jidx+k], A.data[iidx+k]
 	}
 }
 
 func (A DenseM) SwapCols(i, j int) {
 	for k := 0; k < A.r; k++ {
-		A.data[k*A.stride+i], A.data[k*A.stride+j] = A.data[k*A.stride+j], A.data[k*A.stride+i]
+		ridx := k * A.stride
+		A.data[ridx+i], A.data[ridx+j] = A.data[ridx+j], A.data[ridx+i]
 	}
 }
 
@@ -284,4 +308,16 @@ func (dst *DenseM) CopyBlocks(mrows, mcols int, src []Matrix) error {
 		br += h
 	}
 	return nil
+}
+
+// DoSet iterates over all matrix elements calling fn on them and setting
+// the value at i,j to the result of fn.
+func (A DenseM) DoSet(fn func(i, j int, v float64) float64) {
+	for i := 0; i < A.r; i++ {
+		offset := i * A.stride
+		for j := 0; j < A.c; j++ {
+			got := A.data[offset+j]
+			A.data[offset+j] = fn(i, j, got)
+		}
+	}
 }
