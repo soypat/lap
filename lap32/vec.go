@@ -156,11 +156,11 @@ func (v *DenseV) MulElemVec(a, b Vector) {
 
 // DoSet iterates over all vector elements calling fn on them and setting
 // the value at i to the result of fn.
-func (A DenseV) DoSetVec(fn func(i int, v float32) float32) {
+func (v DenseV) DoSetVec(fn func(i int, v float32) float32) {
 	// TODO(soypat): This could be optimized for direct access.
-	n := A.Len()
+	n := v.Len()
 	for i := 0; i < n; i++ {
-		A.SetVec(i, fn(i, A.AtVec(i)))
+		v.SetVec(i, fn(i, v.AtVec(i)))
 	}
 }
 
@@ -182,6 +182,8 @@ func dataHeader(m Matrix) reflect.SliceHeader {
 	case DenseM:
 		backingData = D.data
 	case DenseV:
+		backingData = D.data
+	case *DenseV:
 		backingData = D.data
 	case subMat:
 		return dataHeader(D.m)
