@@ -48,10 +48,10 @@ type Sparse struct {
 	r, c int
 }
 
-var _ Matrix = Sparse{}
+var _ Matrix = &Sparse{}
 
 // At returns the element at ith row, jth column.
-func (s Sparse) At(i, j int) float64 {
+func (s *Sparse) At(i, j int) float64 {
 	if i >= s.r {
 		panic(ErrRowAccess)
 	} else if j >= s.c {
@@ -64,7 +64,7 @@ func (s Sparse) At(i, j int) float64 {
 }
 
 // At sets the element at ith row, jth column to v.
-func (s Sparse) Set(i, j int, v float64) {
+func (s *Sparse) Set(i, j int, v float64) {
 	if i >= s.r {
 		panic(ErrRowAccess)
 	} else if j >= s.c {
@@ -81,13 +81,13 @@ func (s Sparse) Set(i, j int, v float64) {
 }
 
 // Dims returns the dimensions of the sparse matrix.
-func (s Sparse) Dims() (int, int) {
+func (s *Sparse) Dims() (int, int) {
 	return s.r, s.c
 }
 
 // NewSparse creates a sparse matrix of size rxc.
-func NewSparse(r, c int) Sparse {
-	s := Sparse{
+func NewSparse(r, c int) *Sparse {
+	s := &Sparse{
 		r: r,
 		c: c,
 		m: make(map[[2]int]float64),
@@ -113,19 +113,19 @@ func (s *Sparse) Resize(r, c int) {
 }
 
 // Accumulate adds indexed data to s.
-func (s Sparse) Accumulate(data SparseAccum) {
+func (s *Sparse) Accumulate(data SparseAccum) {
 	s.GeneralAccumulate(false, 0, 0, data)
 }
 
 // GeneralAccumulate adds indexed data to s. The input data can be transposed
 // with trans set to true. s index offsets may be set with iOffset and jOffset.
-func (s Sparse) GeneralAccumulate(trans bool, iOffset, jOffset int, data SparseAccum) {
+func (s *Sparse) GeneralAccumulate(trans bool, iOffset, jOffset int, data SparseAccum) {
 	if len(data.I) != len(data.J) || len(data.V) != len(data.I) {
 		panic("length of arguments must be equal")
 	}
-	if len(s.m) == 0 {
-		s.m = make(map[[2]int]float64, len(data.V)/16)
-	}
+	// if len(s.m) == 0 {
+	// 	s.m = make(map[[2]int]float64, len(data.V)/16)
+	// }
 	var ix, jx int
 	for i, v := range data.V {
 
@@ -151,14 +151,14 @@ func (s Sparse) GeneralAccumulate(trans bool, iOffset, jOffset int, data SparseA
 // DoNonZero iterates over all non-zero values in sparse matrix.
 // The function fn takes a row/column index and the element value of b at (i, j).
 // No specific ordering is guaranteed.
-func (s Sparse) DoNonZero(fn func(i, j int, v float64)) {
+func (s *Sparse) DoNonZero(fn func(i, j int, v float64)) {
 	for k, v := range s.m {
 		fn(k[0], k[1], v)
 	}
 }
 
 // CountNonZero returns number of non-zero elements in sparse matrix.
-func (s Sparse) CountNonZero() int { return len(s.m) }
+func (s *Sparse) CountNonZero() int { return len(s.m) }
 
 // Zero sets all matrix values to zero.
 func (s *Sparse) Zero() {
