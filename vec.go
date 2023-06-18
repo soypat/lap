@@ -31,6 +31,14 @@ func NewDenseVector(n int, data []float64) DenseV {
 	}
 }
 
+// Set implements the matrixSetter interface.
+func (v DenseV) Set(i, j int, f float64) {
+	if j != 0 {
+		panic(ErrColAccess)
+	}
+	v.SetVec(i, f)
+}
+
 func (v DenseV) Dims() (int, int) { return v.Len(), 1 }
 func (v DenseV) At(i, j int) float64 {
 	if j != 0 {
@@ -183,10 +191,10 @@ func dataHeader(m Matrix) reflect.SliceHeader {
 		backingData = D.data
 	case DenseV:
 		backingData = D.data
-	case subMat:
+	case SliceM:
 		return dataHeader(D.m)
-	case subVec:
-		return dataHeader(D.m)
+	case SliceV:
+		return dataHeader(D.sm)
 	case Transpose:
 		return dataHeader(D.m)
 	default:

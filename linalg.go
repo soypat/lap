@@ -61,9 +61,10 @@ func Min(m Matrix) float64 {
 }
 
 // Norm returns the specified norm of the matrix A. Valid norms are:
-//  1 - The maximum absolute column sum
-//  2 - The Frobenius norm, the square root of the sum of the squares of the elements
-//  Inf - The maximum absolute row sum
+//
+//	1 - The maximum absolute column sum
+//	2 - The Frobenius norm, the square root of the sum of the squares of the elements
+//	Inf - The maximum absolute row sum
 func Norm(A Matrix, norm float64) float64 {
 	r, c := A.Dims()
 	switch norm {
@@ -131,4 +132,10 @@ func Argmax(A Matrix) (imax, jmax int) {
 		}
 	}
 	return imax, jmax
+}
+
+func irange(dst []int, start, stride int) {
+	for i := 0; i < len(dst); i++ {
+		dst[i] = start + i*stride
+	}
 }

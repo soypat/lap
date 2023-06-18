@@ -18,6 +18,11 @@ type Matrix interface {
 	Dims() (r, c int)
 }
 
+type matrixSetter interface {
+	Matrix
+	Set(i, j int, v float64)
+}
+
 // DenseM represents a row major storage matrix.
 type DenseM struct {
 	data   []float64
@@ -51,7 +56,7 @@ func (d *DenseM) Set(i, j int, v float64) {
 // Copy produces a copy of A with no overlapping memory.
 // If the receiver is not initialized then the backing array is allocated
 // automatically.
-func (d *DenseM) Copy(A Matrix) {
+func (d *DenseM) Copy(A Matrix) (rowsCopied, colsCopied int) {
 	r, c := A.Dims()
 	if d.data == nil {
 		*d = NewDenseMatrix(r, c, nil)
@@ -59,11 +64,19 @@ func (d *DenseM) Copy(A Matrix) {
 	if r != d.r || c != d.c {
 		panic(ErrDim)
 	}
+	if Ad, ok := A.(*DenseM); ok && Ad.stride == d.stride {
+		n := copy(d.data, Ad.data)
+		if n != r*c {
+			panic("copy failed")
+		}
+		return d.r, d.c
+	}
 	for i := 0; i < d.r; i++ {
 		for j := 0; j < d.c; j++ {
 			d.data[i*d.stride+j] = A.At(i, j)
 		}
 	}
+	return d.r, d.c
 }
 
 // NewDenseMatrix produces a new (rxc) matrix backed by contiguous data.
@@ -232,7 +245,7 @@ func (C *DenseM) Scale(f float64, A Matrix) {
 }
 
 // SwapRows swaps rows i and j of A in-place.
-func (A DenseM) SwapRows(i, j int) {
+func (A *DenseM) SwapRows(i, j int) {
 	iidx := i * A.stride
 	jidx := j * A.stride
 	for k := 0; k < A.c; k++ {
@@ -240,14 +253,14 @@ func (A DenseM) SwapRows(i, j int) {
 	}
 }
 
-func (A DenseM) SwapCols(i, j int) {
+func (A *DenseM) SwapCols(i, j int) {
 	for k := 0; k < A.r; k++ {
 		ridx := k * A.stride
 		A.data[ridx+i], A.data[ridx+j] = A.data[ridx+j], A.data[ridx+i]
 	}
 }
 
-func (A DenseM) RowView(i int) DenseV {
+func (A *DenseM) RowView(i int) DenseV {
 	if i >= A.r || i < 0 {
 		panic(ErrRowAccess)
 	}
@@ -256,7 +269,7 @@ func (A DenseM) RowView(i int) DenseV {
 	}
 }
 
-func (A DenseM) ColView(j int) DenseV {
+func (A *DenseM) ColView(j int) DenseV {
 	if j >= A.c || j < 0 {
 		panic(ErrColAccess)
 	}
@@ -315,7 +328,7 @@ func (dst *DenseM) CopyBlocks(mrows, mcols int, src []Matrix) error {
 
 // DoSet iterates over all matrix elements calling fn on them and setting
 // the value at i,j to the result of fn.
-func (A DenseM) DoSet(fn func(i, j int, v float64) float64) {
+func (A *DenseM) DoSet(fn func(i, j int, v float64) float64) {
 	for i := 0; i < A.r; i++ {
 		offset := i * A.stride
 		for j := 0; j < A.c; j++ {
