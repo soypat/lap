@@ -191,6 +191,8 @@ func dataHeader(m Matrix) reflect.SliceHeader {
 		backingData = D.data
 	case DenseV:
 		backingData = D.data
+	case *DenseV:
+		backingData = D.data
 	case SliceM:
 		return dataHeader(D.m)
 	case SliceV:
@@ -198,7 +200,7 @@ func dataHeader(m Matrix) reflect.SliceHeader {
 	case Transpose:
 		return dataHeader(D.m)
 	default:
-		panic("unknown Matrix type. Can't determine backing data" + fmt.Sprintf("%T", D))
+		panic("unknown Matrix type. Can't determine backing data " + fmt.Sprintf("%T", D))
 	}
 	return *(*reflect.SliceHeader)(unsafe.Pointer(&backingData))
 }
