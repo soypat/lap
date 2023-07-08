@@ -269,6 +269,25 @@ func TestMatRowView(t *testing.T) {
 	}
 }
 
+func TestSliceVec(t *testing.T) {
+	var stairs = NewDenseVector(10, nil)
+	for i := 0; i < 10; i++ {
+		stairs.SetVec(i, float64(i))
+	}
+	var v DenseV
+	idx := []int{1, 3, 5, 9}
+	slice := SliceVec(stairs, idx)
+	n := v.CopyVec(slice)
+	if n != len(idx) {
+		t.Error("slice copy length wrong")
+	}
+	for i := range idx {
+		if v.AtVec(i) != stairs.AtVec(idx[i]) || v.AtVec(i) != slice.AtVec(i) {
+			t.Error("slice copy wrong", Formatted(&v), Formatted(slice), stairs)
+		}
+	}
+}
+
 // func TestSquareMatrixInvert(t *testing.T) {
 // 	inp := NewDenseMatrix(2, 2, []float64{
 // 		1, 2,

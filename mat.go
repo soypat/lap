@@ -11,6 +11,7 @@ var (
 	ErrRowAccess   = errors.New("bad row access")
 	ErrColAccess   = errors.New("bad column access")
 	ErrDim         = errors.New("bad dimension")
+	errImmutable   = errors.New("immutable matrix")
 )
 
 type Matrix interface {
@@ -31,10 +32,10 @@ type DenseM struct {
 }
 
 // Dims returns the dimensions of the matrix.
-func (d DenseM) Dims() (int, int) { return d.r, d.c }
+func (d *DenseM) Dims() (int, int) { return d.r, d.c }
 
 // At returns d's element at ith row, jth column.
-func (d DenseM) At(i, j int) float64 {
+func (d *DenseM) At(i, j int) float64 {
 	if i < 0 || i >= d.r {
 		panic(ErrRowAccess)
 	} else if j < 0 || j >= d.c {
@@ -59,7 +60,7 @@ func (d *DenseM) Set(i, j int, v float64) {
 func (d *DenseM) Copy(A Matrix) (rowsCopied, colsCopied int) {
 	r, c := A.Dims()
 	if d.data == nil {
-		*d = NewDenseMatrix(r, c, nil)
+		*d = *NewDenseMatrix(r, c, nil)
 	}
 	if r != d.r || c != d.c {
 		panic(ErrDim)
@@ -84,11 +85,11 @@ func (d *DenseM) Copy(A Matrix) (rowsCopied, colsCopied int) {
 // of the output from being scattered in memory.
 //
 // data may be nil, in which case an array of zeros is returned
-func NewDenseMatrix(r, c int, data []float64) (d DenseM) {
+func NewDenseMatrix(r, c int, data []float64) (d *DenseM) {
 	if data == nil {
 		data = make([]float64, r*c)
 	}
-	return DenseM{
+	return &DenseM{
 		data:   data,
 		r:      r,
 		c:      c,
@@ -123,7 +124,7 @@ func Eye(n int) Matrix {
 // final column is l-1.
 // Slice panics with ErrIndexOutOfRange if the slice is outside the capacity
 // of the receiver.
-func (d DenseM) Slice(i, k, j, l int) DenseM {
+func (d *DenseM) Slice(i, k, j, l int) *DenseM {
 	mr, mc := d.Dims()
 	if k <= i || l <= j {
 		// Common error or group with below?
@@ -132,10 +133,12 @@ func (d DenseM) Slice(i, k, j, l int) DenseM {
 	if i < 0 || mr <= i || j < 0 || mc <= j || mr < k || mc < l {
 		panic(ErrDim)
 	}
-	d.data = d.data[i*d.stride+j : (k-1)*d.stride+l]
-	d.r = k - i
-	d.c = l - j
-	return d
+	return &DenseM{
+		data:   d.data[i*d.stride+j : (k-1)*d.stride+l],
+		stride: d.stride,
+		r:      k - i,
+		c:      l - j,
+	}
 }
 
 type Transpose struct {
@@ -149,6 +152,19 @@ func (t Transpose) At(i, j int) float64 {
 func (t Transpose) Dims() (int, int) {
 	c, r := t.m.Dims()
 	return r, c
+}
+
+func (t Transpose) IsMutable() bool {
+	_, ok := t.m.(matrixSetter)
+	return ok
+}
+
+func (t Transpose) Set(i, j int, v float64) {
+	M, ok := t.m.(matrixSetter)
+	if !ok {
+		panic(errImmutable)
+	}
+	M.Set(j, i, v)
 }
 
 // T returns the implicit transpose of A without copying.
@@ -167,7 +183,7 @@ func (C *DenseM) Mul(A, B Matrix) {
 	n, m := A.Dims()
 	mB, p := B.Dims()
 	if C.data == nil {
-		*C = NewDenseMatrix(n, p, nil)
+		*C = *NewDenseMatrix(n, p, nil)
 	}
 	nC, pC := C.Dims()
 	if m != mB || nC != n || pC != p {
@@ -193,7 +209,7 @@ func (C *DenseM) Add(A, B Matrix) {
 	rA, cA := A.Dims()
 	rB, cB := B.Dims()
 	if C.data == nil {
-		*C = NewDenseMatrix(rA, cA, nil)
+		*C = *NewDenseMatrix(rA, cA, nil)
 	}
 	r, c := C.Dims()
 	if rA != r || rB != r || cA != c || cB != c {
@@ -212,7 +228,7 @@ func (C *DenseM) Sub(A, B Matrix) {
 	rA, cA := A.Dims()
 	rB, cB := B.Dims()
 	if C.data == nil {
-		*C = NewDenseMatrix(rA, cA, nil)
+		*C = *NewDenseMatrix(rA, cA, nil)
 	}
 	r, c := C.Dims()
 	if rA != r || rB != r || cA != c || cB != c {
@@ -230,7 +246,7 @@ func (C *DenseM) Sub(A, B Matrix) {
 func (C *DenseM) Scale(f float64, A Matrix) {
 	rA, cA := A.Dims()
 	if C.data == nil {
-		*C = NewDenseMatrix(rA, cA, nil)
+		*C = *NewDenseMatrix(rA, cA, nil)
 	}
 	r, c := C.Dims()
 	if rA != r || cA != c {
@@ -260,20 +276,20 @@ func (A *DenseM) SwapCols(i, j int) {
 	}
 }
 
-func (A *DenseM) RowView(i int) DenseV {
+func (A *DenseM) RowView(i int) *DenseV {
 	if i >= A.r || i < 0 {
 		panic(ErrRowAccess)
 	}
-	return DenseV{
+	return &DenseV{
 		data: A.data[i*A.stride : (i+1)*A.stride],
 	}
 }
 
-func (A *DenseM) ColView(j int) DenseV {
+func (A *DenseM) ColView(j int) *DenseV {
 	if j >= A.c || j < 0 {
 		panic(ErrColAccess)
 	}
-	return DenseV{
+	return &DenseV{
 		data:        A.data[j:],
 		incMinusOne: A.stride - 1,
 	}
@@ -295,7 +311,7 @@ func (dst *DenseM) CopyBlocks(mrows, mcols int, src []Matrix) error {
 		tc += c
 	}
 	if dst.data == nil {
-		*dst = NewDenseMatrix(tr, tc, nil)
+		*dst = *NewDenseMatrix(tr, tc, nil)
 	}
 	r, c := dst.Dims()
 	if r != tr || c != tc {

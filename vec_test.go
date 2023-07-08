@@ -39,7 +39,7 @@ func TestMatVecProd(t *testing.T) {
 	exp := NewDenseVector(2, []float64{8, 42})
 	var res DenseV
 	res.MulVec(A, b)
-	if !vectorEqual(exp, res) {
+	if !vectorEqual(exp, &res) {
 		t.Error("matrix-vector product gave incorrect result", exp, res)
 	}
 }

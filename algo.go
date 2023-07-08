@@ -6,7 +6,7 @@ import (
 )
 
 // JacobiSVD computes the Jacobi SVD of A, returning U, Sigma, V^T
-func JacobiSVD(A DenseM) (sigma DenseV) {
+func JacobiSVD(A *DenseM) (sigma *DenseV) {
 	const tol = 1e-14
 	var rots int = 1
 	nrow, ncol := A.Dims()
@@ -106,7 +106,7 @@ func (out *DenseM) invertSquare(A Matrix, scratchSlice []float64) error {
 	}
 	n2 := 2 * n
 	if out.data == nil {
-		*out = NewDenseMatrix(n, n, nil)
+		*out = *NewDenseMatrix(n, n, nil)
 	}
 	var scratchZeroed bool
 	if scratchSlice == nil {

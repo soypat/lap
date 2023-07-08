@@ -50,8 +50,8 @@ func Slice(m Matrix, rowIx, colIx []int) SliceM {
 	return SliceM{ridx: rowIx, cidx: colIx, m: m}
 }
 
-// IsModifiable returns true if the underlying matrix can be modified via Set and Copy calls.
-func (sm SliceM) IsModifiable() bool {
+// IsMutable returns true if the underlying matrix can be modified via Set and Copy calls.
+func (sm SliceM) IsMutable() bool {
 	_, ok := sm.m.(matrixSetter)
 	return ok
 }
@@ -109,13 +109,21 @@ func (sv SliceV) Len() int            { return len(sv.sm.ridx) }
 func (sv SliceV) Dims() (int, int)    { return sv.sm.Dims() }
 func (sv SliceV) At(i, j int) float64 { return sv.sm.At(i, j) }
 
-func (sv SliceV) IsModifiable() bool {
-	return sv.sm.IsModifiable()
+func (sv SliceV) IsMutable() bool {
+	return sv.sm.IsMutable()
 }
 
 func (sv SliceV) CopyVec(v Vector) int {
-	r, _ := sv.sm.Copy(v)
-	return r
+	if !sv.IsMutable() {
+		panic(errImmutable)
+	}
+	if v.Len() != sv.Len() {
+		panic(ErrDim)
+	}
+	for i := 0; i < sv.Len(); i++ {
+		sv.SetVec(i, v.AtVec(i))
+	}
+	return sv.Len()
 }
 
 func (sv SliceV) SetVec(i int, v float64) {
